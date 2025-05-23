@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en_GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="author" content="Petr Studený petr.studeny@etnetera.cz">
+  <title>ETN Core Kustomize deep dive</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js/dist/reset.css">
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js/dist/reveal.css">
+  <style>
+    .reveal .sourceCode {  /* see #7635 */
+      overflow: visible;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+      }
+    pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+    div.sourceCode
+      { color: #cccccc; background-color: #303030; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ffcfaf; } /* Alert */
+    code span.an { color: #7f9f7f; font-weight: bold; } /* Annotation */
+    code span.at { } /* Attribute */
+    code span.bn { color: #dca3a3; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #f0dfaf; } /* ControlFlow */
+    code span.ch { color: #dca3a3; } /* Char */
+    code span.cn { color: #dca3a3; font-weight: bold; } /* Constant */
+    code span.co { color: #7f9f7f; } /* Comment */
+    code span.cv { color: #7f9f7f; font-weight: bold; } /* CommentVar */
+    code span.do { color: #7f9f7f; } /* Documentation */
+    code span.dt { color: #dfdfbf; } /* DataType */
+    code span.dv { color: #dcdccc; } /* DecVal */
+    code span.er { color: #c3bf9f; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #c0bed1; } /* Float */
+    code span.fu { color: #efef8f; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #7f9f7f; font-weight: bold; } /* Information */
+    code span.kw { color: #f0dfaf; } /* Keyword */
+    code span.op { color: #f0efd0; } /* Operator */
+    code span.ot { color: #efef8f; } /* Other */
+    code span.pp { color: #ffcfaf; font-weight: bold; } /* Preprocessor */
+    code span.sc { color: #dca3a3; } /* SpecialChar */
+    code span.ss { color: #cc9393; } /* SpecialString */
+    code span.st { color: #cc9393; } /* String */
+    code span.va { } /* Variable */
+    code span.vs { color: #cc9393; } /* VerbatimString */
+    code span.wa { color: #7f9f7f; font-weight: bold; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js/dist/theme/black.css" id="theme">
+  <style>
+  div.sourceCode {
+      background-color: rgba(255,255,205,0.03);
+      margin: 10px
+      }
+  .reveal .sourceCode {
+      overflow-y: scroll;
+      }
+  .reveal code {
+      background-color: rgba(0,0,0,0.3);
+      font-family: Iosevka
+      }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide">
+  <h1 class="title"><p><img data-src="etnetera-core-vertical-white.svg"
+style="position:absolute;left:0px;width:15.0%" alt="ETN Core" /></br>
+Kustomize deep dive</p></h1>
+  <p class="author">Petr Studený <a
+href="mailto:petr.studeny@etnetera.cz"
+class="email">petr.studeny@etnetera.cz</a></p>
+</section>
+
+<section>
+<section id="scratch-the-surface" class="title-slide slide level1">
+<h1>Scratch the surface</h1>
+
+</section>
+<section id="kubernetes-api-and-kubectl"
+class="title-slide slide level2">
+<h2>Kubernetes API and kubectl</h2>
+<ul>
+<li>REST API including PUT and PATCH with dry-run option</li>
+<li>write your manifests</li>
+<li>kubectl <code>apply</code> vs. <code>replace</code>;
+<code>patch</code>
+<ul>
+<li>prefer declarative way with <code>apply</code> for GitOps</li>
+<li><code>kubectl patch</code> - partial update using strategic merge,
+json merge or json patch</li>
+<li>strategic merge requires merge strategy defined in <a
+href="https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy">API
+reference</a></li>
+</ul></li>
+</ul>
+</section>
+
+<section id="kubernetes-configuration-management-systems"
+class="title-slide slide level2">
+<h2>Kubernetes configuration management systems</h2>
+<ul>
+<li>Helm</li>
+<li><a
+href="https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/">Kustomize</a></li>
+<li>Jsonnet</li>
+<li>Kpt; <a
+href="https://docs.ansible.com/ansible/latest/collections/kubernetes/core/k8s_module.html">Ansible</a>;
+<a
+href="https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs">Terraform</a>;
+Pulumi; etc.</li>
+</ul>
+</section>
+
+<section id="kustomize" class="title-slide slide level2">
+<h2>Kustomize</h2>
+<ul>
+<li>native and part of kubectl or standalone binary</li>
+<li>rebase and patch like in software packaging</li>
+<li>embrace manifests</li>
+<li>declarative or imperative</li>
+<li>template free {{ approach }}</li>
+<li>base resource is valid kubernetes manifest</li>
+<li>e.g. configMap key is the smallest item</li>
+</ul>
+</section>
+</section>
+<section>
+<section id="deep-dive" class="title-slide slide level1">
+<h1>Deep dive</h1>
+
+</section>
+<section id="kustomization.yaml" class="title-slide slide level2">
+<h2>Kustomization.yaml</h2>
+<p><code>kustomize init --auto-detect</code></p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> kustomize.config.k8s.io/v1beta1</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> Kustomization</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">namespace</span><span class="kw">:</span><span class="at"> my-cool-app</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">images</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span><span class="co">  # accepts glob</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">patches</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">configMapGenerator</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">secretGenerator</span><span class="kw">:</span><span class="at"> </span><span class="kw">[]</span></span></code></pre></div>
+</section>
+
+<section id="resources-components" class="title-slide slide level2">
+<h2>Resources &amp; Components</h2>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> base</span><span class="co">     # directory with kustomization.yaml</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> service.yaml</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> git@github.com:prometheus-operator/prometheus-operator.git?ref=master</span><span class="co"> # git:: deprecated</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> https://github.com/mongodb/mongodb-kubernetes-operator.git//config/default</span></span></code></pre></div>
+<ul>
+<li><a
+href="https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/1802-kustomize-components">Components</a>
+like resources but can be included from multiple overlays, transformers
+(patches) are applied on resources included from different sources</li>
+</ul>
+</section>
+
+<section id="generators-transfomers" class="title-slide slide level2">
+<h2>Generators &amp; Transfomers</h2>
+<ul>
+<li>Fundamental concepts - not used directly</li>
+<li>configMapGenerator and secretGenerator - implementations of
+Generator</li>
+<li>HelmChartInflator is special kind of Generator with <a
+href="https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/helmcharts/">limited
+support</a></li>
+<li>images, namespace, replicas, patches, … - implementations of
+Transformer</li>
+</ul>
+</section>
+
+<section id="patches" class="title-slide slide level2">
+<h2>Patches</h2>
+<ul>
+<li>choose target using mostly its <code>kind</code> and
+<code>name</code> or <code>labelSelector</code></li>
+<li>anchored regex for <code>name</code> and <code>namespace</code>
+fields</li>
+<li>patch can be a file or inline string</li>
+</ul>
+</section>
+<section id="json-patch" class="slide level3">
+<h3>JSON Patch</h3>
+<ul>
+<li>for brief syntax</li>
+<li>Jsonpointer [<a
+href="https://datatracker.ietf.org/doc/html/rfc6901">RFC-6901</a>]
+<ul>
+<li><code>/</code> delimited json path with <code>~</code> encoded as
+<code>~0</code>, <code>/</code> encoded as <code>~1</code></li>
+<li>cannot address list item by its value</li>
+</ul></li>
+<li>Jsonpatch [<a
+href="https://datatracker.ietf.org/doc/html/rfc6902">RFC-6902</a>]
+<ul>
+<li>add, replace, remove; <code>-</code> append at the end of list</li>
+</ul></li>
+</ul>
+</section>
+<section id="json-patch-example" class="slide level3">
+<h3>JSON Patch example</h3>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="fu">target</span><span class="kw">:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">kind</span><span class="kw">:</span><span class="at"> Deployment</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> my-(back|front)end</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="fu">    patch</span><span class="kw">: </span><span class="ch">|-</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>      - op: add</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        path: /spec/template/spec/volumes/-</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        value:</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>          name: import</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>          persistentVolumeClaim:</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>            claimName: import</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>      - op: add</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>        path: /spec/template/spec/containers/0/volumeMounts/-</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>        value:</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>          name: import</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>          mountPath: /data/import</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>      - op: replace</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>        path: &quot;/metadata/annotations/haproxy.org~1forwarder-for&quot;</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        value: &quot;true&quot;</span></code></pre></div>
+</section>
+<section id="strategic-merge" class="slide level3">
+<h3>Strategic Merge</h3>
+<ul>
+<li>verbose yet precise</li>
+<li>unknown resource treated as json merge [<a
+href="https://datatracker.ietf.org/doc/html/rfc7386">RFC-7389</a>]</li>
+<li>can delete whole yaml objects using the special key
+<code>$patch: delete</code></li>
+</ul>
+</section>
+<section id="strategic-merge-patch-example" class="slide level3">
+<h3>Strategic Merge Patch example</h3>
+<ul>
+<li>Delete whole resource</li>
+</ul>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">target</span><span class="kw">:</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">kind</span><span class="kw">:</span><span class="at"> Service</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">name</span><span class="kw">:</span><span class="at"> cilium-agent</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">  patch</span><span class="kw">: </span><span class="ch">|-</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    kind: Service</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    metadata:</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>      name: cilium-agent</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    $patch: delete</span></code></pre></div>
+<ul>
+<li>provide context so <a
+href="https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md">SMP</a>
+knows what to change</li>
+<li><code>metadata.name</code> is required but not used.</li>
+</ul>
+</section>
+
+<section id="replacemets" class="title-slide slide level2">
+<h2>Replacemets</h2>
+<ul>
+<li>replace resource value with value from other resource</li>
+</ul>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>-</th>
+<th>+</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>the source resource must be part of applied manifest</td>
+<td>can address list item by content</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>multiple targets</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>partial string replacement</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="replacement-example" class="slide level3">
+<h3>Replacement example</h3>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">replacements</span><span class="kw">:</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="fu">source</span><span class="kw">:</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">kind</span><span class="kw">:</span><span class="at"> Namespace</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">fieldPath</span><span class="kw">:</span><span class="at"> metadata.name</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">targets</span><span class="kw">:</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">select</span><span class="kw">:</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">kind</span><span class="kw">:</span><span class="at"> RoleBinding</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">fieldPaths</span><span class="kw">:</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> subjects.[name=etndevel].namespace</span></span></code></pre></div>
+</section>
+
+<section id="extras" class="title-slide slide level2">
+<h2>Extras</h2>
+<ul>
+<li><p><code>kubectl diff -k</code> is noisy</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> kustomize <span class="at">--enable-helm</span> <span class="kw">|</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> diff <span class="at">-f</span> <span class="at">-</span> <span class="kw">|</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-v</span> <span class="at">-e</span> <span class="st">&quot;f:[[:alnum:]]&quot;</span> <span class="at">-e</span> <span class="st">&quot;k:[^[:alnum:]]&quot;</span> <span class="at">-e</span> <span class="st">&quot;\.: {}&quot;</span> <span class="dt">\</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>     <span class="at">-e</span> <span class="st">&quot;^-    app.kubernetes.io/instance:&quot;</span> <span class="at">-e</span> <span class="st">&quot;^-  labels:&quot;</span></span></code></pre></div></li>
+<li><p><code>kustomize localize</code> resolve remote
+dependencies</p></li>
+<li><p>helmChart Inflator (wait for more)</p></li>
+<li><p><a
+href="https://github.com/kubernetes-sigs/kustomize/blob/master/cmd/config/docs/api-conventions/functions-spec.md">KRM
+functions</a> little containers that help build final manifests</p></li>
+</ul>
+</section>
+<section id="helmchart-inflator" class="slide level3">
+<h3>HelmChart inflator</h3>
+<ul>
+<li>kustomization approach is buggy <a
+href="https://github.com/kubernetes-sigs/kustomize/issues/4593">#4593</a></li>
+<li>use generators with manifest of kind:
+HelmChartInflationGenerator</li>
+<li>use with <code>--enable-helm</code></li>
+<li>local charts directory not <a
+href="https://github.com/kubernetes-sigs/kustomize/blob/master/examples/chart.md#how-does-the-pull-work">pulled</a>
+if present</li>
+<li>generated template can be used as any kustomize base</li>
+</ul>
+</section>
+</section>
+<section id="section" class="title-slide slide level1">
+<h1></h1>
+<figure>
+<img data-src="diagram/k8s_simple.svg" height="550"
+alt="Diagram from the wild" />
+<figcaption aria-hidden="true"><a href="diagram/k8s_simple.dot">Diagram
+from the wild</a></figcaption>
+</figure>
+</section>
+
+<section id="qa" class="title-slide slide level1">
+<h1>Q&amp;A</h1>
+<blockquote>
+<p>Created with pandoc and reveal.js, from markdown to interactive
+html;<br />
+can be printed to PDF.</p>
+</blockquote>
+<blockquote>
+<p>Petr Studený <span class="citation"
+data-cites="dosmanak">@dosmanak</span></p>
+</blockquote>
+</section>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/reveal.js/dist/reveal.js"></script>
+
+  <!-- reveal.js plugins -->
+  <script src="https://unpkg.com/reveal.js/plugin/notes/notes.js"></script>
+  <script src="https://unpkg.com/reveal.js/plugin/search/search.js"></script>
+  <script src="https://unpkg.com/reveal.js/plugin/zoom/zoom.js"></script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+        // Display controls in the bottom right corner
+        controls: true,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: true,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'bottom-right',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: false,
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: false,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: true,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'default',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: true,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'slide',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'fade',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // Parallax background image
+        parallaxBackgroundImage: 'parallaxETNBCK.svg', // e.g. "'https://s3.amazonaws.com/hakim-static/reveal-js/reveal-parallax-1.jpg'"
+
+        // Parallax background size
+        parallaxBackgroundSize: '3840px 2160px', // CSS syntax, e.g. "2100px 900px"
+
+        // reveal.js plugins
+        plugins: [
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    </body>
+</html>

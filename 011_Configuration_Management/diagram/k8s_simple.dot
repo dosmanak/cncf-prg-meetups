@@ -1,0 +1,51 @@
+digraph {
+  rankdir="RL"
+  ranksep=1.5
+  bgcolor="#ffffffa0"
+  subgraph cluster_project1{
+    label="Project 1"
+    rank=source
+    node [ shape="rectangle" ]
+    {
+    DEV1 [label="DEV\nimage:proj1-10-20240115-1335"]
+    TEST1 [label="TEST\nimage:proj1-10-20240110-1330"]
+    PROD1 [label="PROD\nimage:proj1-10-20240110-1330\nreplicas:3"]
+    }
+    "DEV-TEST-common1" [label="DEV-TEST-common"]
+    "PROD-common1" [label="PROD-common"]
+  }
+  subgraph cluster_project2 {
+    label="Project 2"
+    rank=source
+    node [ shape="rectangle" ]
+    {
+    DEV2 [label="DEV\nimage:proj2-13-20240316-1630"]
+    TEST2 [label="TEST\nimage:proj2-13-20240316-1630"]
+    PROD2 [label="PROD\nimage:proj2-13-20240116-1330\nreplicas:2"]
+    }
+    "DEV-TEST-common2" [label="DEV-TEST-common"]
+    "PROD-common2" [label="PROD-common"]
+  }
+  subgraph {  
+    app1 [ label="app1@v1.1.0" ]
+    app1a [ label="app1@v1.2.0" ]
+    app3 [ label="app3@v1.1.0" ]
+    app3a [ label="app3@v1.2.0" ]
+  }
+  subgraph {
+    infra_app1, infra_app2 [ label="\N@v1.0.0" ]
+    infra_app1a [ label="infra_app1@v1.5.0" ]
+    infra_app2a [ label="infra_app2@v2.0.0" ]
+  }
+  subgraph {
+    //edge [minlen="2"]
+    DEV1, TEST1 -> app1, app3a
+    DEV2, TEST2 -> app1a, app3a
+    PROD1 -> app1, app3
+    PROD2 -> app1, app3
+    "DEV-TEST-common1" -> infra_app1, infra_app2a
+    "PROD-common1" -> infra_app1, infra_app2
+    "DEV-TEST-common2" -> infra_app1a, infra_app2a
+    "PROD-common2" -> infra_app1, infra_app2
+  }
+}
